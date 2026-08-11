@@ -1,0 +1,71 @@
+# ============================================
+# Java / Maven
+# ============================================
+target/
+*.jar
+*.war
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# ============================================
+# Node / React
+# ============================================
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ============================================
+# Logs de la aplicación
+#
+# La carpeta se versiona (Promtail la monta) pero su contenido no.
+# ============================================
+logs/*
+!logs/.gitkeep
+
+# ============================================
+# Datos de contenedores
+#
+# Los volúmenes son nombrados y viven fuera del proyecto, pero por si acaso:
+# nunca subir datos de Prometheus ni de Postgres al repositorio.
+# ============================================
+infra/observability/prometheus/data/
+infra/postgres/data/
+
+# ============================================
+# IDE
+# ============================================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# ============================================
+# Sistema operativo
+# ============================================
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Secretos y configuración local
+#
+# Hoy las credenciales están en el compose porque es un entorno de desarrollo
+# local (ver la sección de seguridad del documento). Si en algún momento se
+# extraen a un .env, este es el que evita subirlo.
+# ============================================
+.env
+.env.local
+*.pem
+*.key
+
+# ============================================
+# Copias de seguridad
+# ============================================
+*.bak
+*.orig

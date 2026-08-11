@@ -1,0 +1,30 @@
+# =============================================================================
+# Configuración solo para pruebas.
+#
+# H2 en modo PostgreSQL: se parece lo suficiente al motor real para validar el
+# mapeo JPA sin necesitar un contenedor levantado. Flyway se desactiva y el
+# esquema lo genera Hibernate, porque aquí lo que se prueba es el mapeo, no las
+# migraciones.
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:h2:mem:orderdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+jwt:
+  secret: clave-de-pruebas-con-al-menos-32-caracteres-para-HS256
+
+logging:
+  level:
+    root: WARN
+    com.tecsup.app.micro.order: INFO

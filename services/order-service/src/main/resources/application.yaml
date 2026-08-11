@@ -1,0 +1,168 @@
+# =============================================================================
+# Servicio de Pedidos
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: order-service
+
+  # ---------------------------------------------------------------------------
+  # Base de datos: orderdb, con su propio rol. Ningún otro servicio se conecta
+  # aquí (ver infra/postgres/init/01-crear-bases.sh).
+  # ---------------------------------------------------------------------------
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/orderdb}
+    username: ${DB_USERNAME:order_svc}
+    password: ${DB_PASSWORD:order_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  # El esquema lo manda Flyway. Hibernate solo comprueba que coincide.
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ---------------------------------------------------------------------------
+  # Kafka
+  # ---------------------------------------------------------------------------
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        # Nombres lógicos en la cabecera de tipo, en vez del nombre de la clase
+        # Java. Sin esto, el consumidor recibiría
+        # "com.tecsup.app.micro.order.domain.event.PedidoCreado" e intentaría
+        # instanciar una clase que en su servicio no existe.
+        spring.json.type.mapping: >
+          pedidoCreado:com.tecsup.app.micro.order.domain.event.PedidoCreado,
+          pedidoConfirmado:com.tecsup.app.micro.order.domain.event.PedidoConfirmado,
+          pedidoEntregado:com.tecsup.app.micro.order.domain.event.PedidoEntregado,
+          pedidoCancelado:com.tecsup.app.micro.order.domain.event.PedidoCancelado
+
+    consumer:
+      group-id: pedidos-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer envuelve al de JSON. Sin esta envoltura, un
+      # mensaje con JSON inválido falla ANTES del listener: el offset no avanza,
+      # el consumidor reintenta el mismo mensaje para siempre y la partición
+      # queda bloqueada. Es el "poison pill".
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.tecsup.app.micro.order.*
+        # El otro extremo del mapeo: nombre lógico -> DTO propio de este servicio
+        spring.json.type.mapping: >
+          pagoConfirmado:com.tecsup.app.micro.order.infrastructure.messaging.dto.PagoConfirmadoDTO,
+          pagoRechazado:com.tecsup.app.micro.order.infrastructure.messaging.dto.PagoRechazadoDTO,
+          entregaEstadoCambiado:com.tecsup.app.micro.order.infrastructure.messaging.dto.EntregaEstadoCambiadoDTO
+
+    # Sin esto la traza se corta en el broker: Zipkin mostraría el POST por un
+    # lado y el consumo del evento por otro, como si no tuvieran relación.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+
+# =============================================================================
+# Dependencia síncrona: la única del sistema
+# =============================================================================
+catalogo:
+  service:
+    url: ${CATALOGO_SERVICE_URL:http://localhost:8082}
+
+# =============================================================================
+# Seguridad
+#
+# Clave simétrica compartida por los 5 servicios. user-service la usa para
+# firmar; los demás solo para verificar. HS256 exige 256 bits, o sea 32
+# caracteres como mínimo.
+#
+# Está en claro porque es un entorno de desarrollo local. En producción iría
+# en un gestor de secretos; la limitación está declarada en la sección 5 del
+# documento de arquitectura.
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET:m1S3cr3tK3yJWT_T3csup2025!@#SecureToken}
+
+# =============================================================================
+# Observabilidad
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0        # 100% en desarrollo; en producción 0.1
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
+
+# =============================================================================
+# Logs
+#
+# JSON en formato ECS a un archivo que lee Promtail y envía a Loki. El trace.id
+# lo inyecta micrometer-tracing, y es lo que permite saltar desde una traza de
+# Zipkin a los logs exactos de esa petición.
+# =============================================================================
+logging:
+  structured:
+    format:
+      file: ecs
+  file:
+    name: ${LOG_FILE:../../logs/order-service.log}
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.tecsup.app.micro.order: ${LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+
+# =============================================================================
+# Swagger UI en http://localhost:8083/swagger-ui.html
+# =============================================================================
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
