@@ -1,0 +1,47 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Lee los .log que escriben los microservicios en la carpeta ./logs del
+  # proyecto. Funciona igual si el servicio corre desde el IDE o dentro de un
+  # contenedor: en ambos casos escribe en la misma carpeta montada.
+  #
+  # Los servicios los generan en formato ECS (JSON) con la configuración
+  # nativa de Spring Boot 3.4+, así que aquí solo hay que extraer campos.
+  # ---------------------------------------------------------------------------
+  - job_name: microservicios
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: microservicios
+          __path__: /logs/*.log
+
+    pipeline_stages:
+      # Las claves ECS llevan punto en el nombre ("log.level"), por eso van
+      # entre comillas: JMESPath las trataría como rutas anidadas si no.
+      - json:
+          expressions:
+            nivel: '"log.level"'
+            servicio: '"service.name"'
+            traceId: '"trace.id"'
+            mensaje: message
+
+      # Solo servicio y nivel como etiquetas. traceId NO va como etiqueta:
+      # tiene un valor distinto por petición y crearía un stream nuevo cada
+      # vez, que es la forma clásica de reventar a Loki con cardinalidad.
+      - labels:
+          servicio:
+          nivel:
+
+      - timestamp:
+          source: '@timestamp'
+          format: RFC3339Nano

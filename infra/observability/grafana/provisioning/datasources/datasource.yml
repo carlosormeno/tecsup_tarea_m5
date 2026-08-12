@@ -1,0 +1,36 @@
+apiVersion: 1
+
+datasources:
+  # Métricas
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  # Trazas
+  - name: Zipkin
+    type: zipkin
+    uid: zipkin
+    access: proxy
+    url: http://zipkin:9411
+    editable: true
+
+  # Logs
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      # Convierte el trace.id que aparece en cada log en un enlace directo
+      # a la traza en Zipkin. Es lo que cierra el círculo de los tres pilares:
+      # una métrica rara -> la traza lenta -> los logs de esa petición exacta.
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"trace\.id":"(\w+)"'
+          url: '$${__value.raw}'
+          datasourceUid: zipkin

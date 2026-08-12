@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: 'Pedidos de Comida'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      # Subcarpeta aparte: si apunta al directorio padre, Grafana intenta
+      # cargar este mismo dashboards.yml como si fuera un dashboard y falla.
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false
