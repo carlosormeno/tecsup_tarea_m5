@@ -36,6 +36,13 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- Solo para TopicsDeReintento, que declara los topics que
+             @RetryableTopic crearía con un número de particiones incorrecto -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>

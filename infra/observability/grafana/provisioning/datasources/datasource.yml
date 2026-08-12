@@ -26,11 +26,18 @@ datasources:
     url: http://loki:3100
     editable: true
     jsonData:
-      # Convierte el trace.id que aparece en cada log en un enlace directo
-      # a la traza en Zipkin. Es lo que cierra el círculo de los tres pilares:
-      # una métrica rara -> la traza lenta -> los logs de esa petición exacta.
+      # Convierte el identificador de traza que aparezca en cada log en un
+      # enlace directo a Zipkin: métrica rara -> traza lenta -> logs de esa
+      # petición exacta.
+      #
+      # PENDIENTE DE VERIFICAR: hay que comprobar con los servicios corriendo
+      # que el formato ECS incluya el traceId en el archivo de log. La consola
+      # sí lo muestra (viene del MDC, patrón `[app,traceId,spanId]`), pero está
+      # sin confirmar que el escritor de ECS lo vuelque al fichero. Si no lo
+      # hiciera, esta expresión no encontrará nada y habría que añadirlo
+      # explícitamente a la configuración de logging.
       derivedFields:
         - name: TraceID
-          matcherRegex: '"trace\.id":"(\w+)"'
+          matcherRegex: '"traceId":"(\w+)"'
           url: '$${__value.raw}'
           datasourceUid: zipkin

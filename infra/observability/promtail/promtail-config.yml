@@ -13,9 +13,6 @@ scrape_configs:
   # Lee los .log que escriben los microservicios en la carpeta ./logs del
   # proyecto. Funciona igual si el servicio corre desde el IDE o dentro de un
   # contenedor: en ambos casos escribe en la misma carpeta montada.
-  #
-  # Los servicios los generan en formato ECS (JSON) con la configuración
-  # nativa de Spring Boot 3.4+, así que aquí solo hay que extraer campos.
   # ---------------------------------------------------------------------------
   - job_name: microservicios
     static_configs:
@@ -26,18 +23,28 @@ scrape_configs:
           __path__: /logs/*.log
 
     pipeline_stages:
-      # Las claves ECS llevan punto en el nombre ("log.level"), por eso van
-      # entre comillas: JMESPath las trataría como rutas anidadas si no.
+      # El formato ECS de Spring Boot ANIDA los campos:
+      #
+      #   {"@timestamp":"...",
+      #    "log":     {"level":"INFO","logger":"com.tecsup..."},
+      #    "service": {"name":"order-service"},
+      #    "message": "..."}
+      #
+      # Por eso las rutas van sin comillas: en JMESPath, `log.level` navega
+      # hasta el objeto anidado, mientras que `"log.level"` buscaría una clave
+      # llamada literalmente así, que no existe. Con las comillas no se extrae
+      # nada y las etiquetas salen vacías.
       - json:
           expressions:
-            nivel: '"log.level"'
-            servicio: '"service.name"'
-            traceId: '"trace.id"'
+            nivel: log.level
+            logger: log.logger
+            servicio: service.name
             mensaje: message
 
-      # Solo servicio y nivel como etiquetas. traceId NO va como etiqueta:
-      # tiene un valor distinto por petición y crearía un stream nuevo cada
-      # vez, que es la forma clásica de reventar a Loki con cardinalidad.
+      # Solo servicio y nivel como etiquetas: son pocos valores distintos.
+      # Nunca el traceId ni el logger completo — cada valor nuevo crea un
+      # stream en Loki, y con identificadores únicos por petición eso degrada
+      # el índice hasta hacerlo inservible.
       - labels:
           servicio:
           nivel:

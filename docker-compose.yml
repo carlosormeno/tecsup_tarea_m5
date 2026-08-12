@@ -89,8 +89,24 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      # Necesario para que @RetryableTopic pueda crear sus topics -retry y -dlt
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+      # Creación automática DESACTIVADA a propósito.
+      #
+      # Con ella activada, un consumidor que arranque antes que el servicio
+      # que publica su topic hace que Kafka lo cree con el valor por defecto
+      # del broker: UNA partición. Y un topic existente ya no cambia de
+      # particiones, así que el sistema quedaría degradado según el orden en
+      # que se levantaran los servicios.
+      #
+      # Desactivada, los topics los crean solo los beans NewTopic de cada
+      # servicio, siempre con 3 particiones. Un consumidor cuyo topic aún no
+      # exista simplemente avisa y reintenta: se recupera solo, y el orden de
+      # arranque deja de importar.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+
+      # Red de seguridad: si algo llegara a crear un topic por otra vía,
+      # que al menos nazca con el número correcto de particiones.
+      KAFKA_NUM_PARTITIONS: 3
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:

@@ -35,6 +35,7 @@
     <modules>
         <module>shared</module>
         <module>catalog-service</module>
+        <module>user-service</module>
         <module>delivery-service</module>
         <module>order-service</module>
         <module>payment-service</module>

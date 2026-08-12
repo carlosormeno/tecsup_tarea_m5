@@ -1,0 +1,146 @@
+# =============================================================================
+# Servicio de Pagos
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: user-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/userdb}
+    username: ${DB_USERNAME:user_svc}
+    password: ${DB_PASSWORD:user_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+
+    # Este servicio no publica eventos de NEGOCIO, pero necesita un productor
+    # igualmente: DeadLetterPublishingRecoverer usa un KafkaTemplate para
+    # enviar a la DLT los mensajes que agotan sus reintentos.
+    #
+    # Sin esto Spring usa StringSerializer por defecto, que no puede
+    # serializar el objeto del evento, la publicación a la DLT falla, el
+    # offset no se confirma y el consumidor entra en bucle. "No publica
+    # eventos" no significa "no necesita productor".
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+
+    consumer:
+      group-id: usuarios-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer envuelve al de JSON: sin él, un mensaje con
+      # JSON inválido falla ANTES del listener, el offset no avanza y la
+      # partición queda bloqueada para siempre (poison pill).
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.tecsup.app.micro.user.*
+        # Nombre lógico que publica order-service -> DTO propio
+        spring.json.type.mapping: >
+          pedidoEntregado:com.tecsup.app.micro.user.infrastructure.messaging.dto.PedidoEntregadoDTO
+
+    # Sin esto la traza se corta en el broker y Zipkin mostraría el cobro como
+    # una traza suelta, sin relación con el pedido que lo originó.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+
+# =============================================================================
+# Seguridad: misma clave simétrica que el resto de servicios
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET:m1S3cr3tK3yJWT_T3csup2025!@#SecureToken}
+  # Solo este servicio usa esta propiedad: es el único que FIRMA tokens.
+  expiracion-segundos: ${JWT_EXPIRACION:3600}
+
+# =============================================================================
+# Observabilidad
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
+
+logging:
+  structured:
+    format:
+      file: ecs
+  file:
+    name: ${LOG_FILE:../../logs/user-service.log}
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.tecsup.app.micro.user: ${LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+
+# Swagger UI en http://localhost:8081/swagger-ui.html
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# =============================================================================
+# Seguridad: rutas sin JWT
+#
+# Ningún endpoint de negocio es público. Solo se abren los que no pueden
+# exigir token: actuator (Prometheus raspa cada 15 s y el JWT caduca en 1 h) y
+# Swagger (inservible en una demostración si hay que pegar un token a mano).
+# user-service añadirá /auth/** a esta lista.
+# =============================================================================
+seguridad:
+  # /auth/** solo se abre AQUÍ: son los endpoints que entregan el token y
+  # no pueden exigirlo. Los otros cuatro servicios no los tienen.
+  rutas-publicas: /auth/**, /actuator/**, /swagger-ui.html, /swagger-ui/**, /v3/api-docs/**

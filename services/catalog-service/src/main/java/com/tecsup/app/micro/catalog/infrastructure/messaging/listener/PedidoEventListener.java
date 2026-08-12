@@ -10,11 +10,10 @@ import com.tecsup.app.micro.catalog.infrastructure.messaging.dto.PedidoConfirmad
 import com.tecsup.app.micro.shared.dlq.DeadLetterQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +38,10 @@ public class PedidoEventListener {
     @RetryableTopic(
             attempts = "4",
             backoff = @Backoff(delay = 2000, multiplier = 2.0),
-            autoCreateTopics = "true",
+            // false: los topics de reintento y DLT los declara KafkaTopicsConfig
+            // con 3 particiones. Si los creara la anotación, los haría con una
+            // sola y la publicación a la DLT fallaría desde las particiones 1 y 2.
+            autoCreateTopics = "false",
             dltTopicSuffix = Topics.SUFIJO_DLT,
             exclude = {
                     ProductoNoEncontradoException.class,
@@ -57,7 +59,10 @@ public class PedidoEventListener {
     @RetryableTopic(
             attempts = "4",
             backoff = @Backoff(delay = 2000, multiplier = 2.0),
-            autoCreateTopics = "true",
+            // false: los topics de reintento y DLT los declara KafkaTopicsConfig
+            // con 3 particiones. Si los creara la anotación, los haría con una
+            // sola y la publicación a la DLT fallaría desde las particiones 1 y 2.
+            autoCreateTopics = "false",
             dltTopicSuffix = Topics.SUFIJO_DLT,
             exclude = {
                     ProductoNoEncontradoException.class,
@@ -87,13 +92,9 @@ public class PedidoEventListener {
                 .toList();
     }
 
+    /** Último recurso: se agotaron los reintentos. */
     @DltHandler
-    public void alAgotarseLosReintentos(
-            Object evento,
-            @Header(name = KafkaHeaders.DLT_ORIGINAL_TOPIC, required = false) String topicOrigen,
-            @Header(name = KafkaHeaders.DLT_ORIGINAL_OFFSET, required = false) byte[] offsetOrigen,
-            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String error) {
-
-        dlq.registrarDesdeDlt(evento, topicOrigen, offsetOrigen, error);
+    public void alAgotarseLosReintentos(ConsumerRecord<?, ?> registro) {
+        dlq.registrar(registro);
     }
 }

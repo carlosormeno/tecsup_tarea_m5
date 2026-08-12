@@ -38,7 +38,19 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
 
-    # Este servicio NO publica eventos, así que no hay bloque `producer`.
+    # Este servicio no publica eventos de NEGOCIO, pero necesita un productor
+    # igualmente: DeadLetterPublishingRecoverer usa un KafkaTemplate para
+    # enviar a la DLT los mensajes que agotan sus reintentos.
+    #
+    # Sin esto Spring usa StringSerializer por defecto, que no puede
+    # serializar el objeto del evento, la publicación a la DLT falla, el
+    # offset no se confirma y el consumidor entra en bucle. "No publica
+    # eventos" no significa "no necesita productor".
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+
     consumer:
       group-id: catalogo-group
       auto-offset-reset: earliest
