@@ -1,0 +1,153 @@
+# =============================================================================
+# Servicio de Pagos
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/paymentdb}
+    username: ${DB_USERNAME:payment_svc}
+    password: ${DB_PASSWORD:payment_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        # Nombres lógicos en la cabecera de tipo. DEBEN coincidir con los que
+        # order-service espera en su consumidor: si aquí dice "pagoConfirmado"
+        # y allí "pago_confirmado", el evento no se deserializa y la saga se
+        # queda parada sin error visible en este lado.
+        spring.json.type.mapping: >
+          pagoConfirmado:com.tecsup.app.micro.payment.domain.event.PagoConfirmado,
+          pagoRechazado:com.tecsup.app.micro.payment.domain.event.PagoRechazado
+
+    consumer:
+      group-id: pagos-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer envuelve al de JSON: sin él, un mensaje con
+      # JSON inválido falla ANTES del listener, el offset no avanza y la
+      # partición queda bloqueada para siempre (poison pill).
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.tecsup.app.micro.payment.*
+        # Nombres lógicos que publica order-service -> DTO propio de este servicio
+        spring.json.type.mapping: >
+          pedidoCreado:com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCreadoDTO,
+          pedidoCancelado:com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCanceladoDTO
+
+    # Sin esto la traza se corta en el broker y Zipkin mostraría el cobro como
+    # una traza suelta, sin relación con el pedido que lo originó.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+
+# =============================================================================
+# Regla de negocio configurable
+#
+# Todo pedido por encima de este importe se rechaza. Es determinista a
+# propósito: permite provocar la compensación de la saga en vivo durante la
+# sustentación, en lugar de depender del azar.
+# =============================================================================
+pagos:
+  limite-autorizado: ${LIMITE_AUTORIZADO:500.00}
+
+# =============================================================================
+# Seguridad: misma clave simétrica que el resto de servicios
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET:m1S3cr3tK3yJWT_T3csup2025!@#SecureToken}
+
+# =============================================================================
+# Observabilidad
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
+
+logging:
+  structured:
+    format:
+      file: ecs
+  file:
+    name: ${LOG_FILE:../../logs/payment-service.log}
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.tecsup.app.micro.payment: ${LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+
+# Swagger UI en http://localhost:8084/swagger-ui.html
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# =============================================================================
+# Seguridad: rutas sin JWT
+#
+# Ningún endpoint de negocio es público. Solo se abren los que no pueden
+# exigir token: actuator (Prometheus raspa cada 15 s y el JWT caduca en 1 h) y
+# Swagger (inservible en una demostración si hay que pegar un token a mano).
+# user-service añadirá /auth/** a esta lista.
+# =============================================================================
+seguridad:
+  rutas-publicas: /actuator/**, /swagger-ui.html, /swagger-ui/**, /v3/api-docs/**

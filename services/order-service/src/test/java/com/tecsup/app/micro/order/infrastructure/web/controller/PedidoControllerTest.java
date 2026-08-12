@@ -9,7 +9,7 @@ import com.tecsup.app.micro.order.domain.model.Pedido;
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;
-import com.tecsup.app.micro.order.infrastructure.security.JwtTokenProvider;
+import com.tecsup.app.micro.shared.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

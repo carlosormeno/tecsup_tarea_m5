@@ -5,7 +5,7 @@ import com.tecsup.app.micro.order.domain.exception.PedidoNoEncontradoException;
 import com.tecsup.app.micro.order.domain.exception.TransicionInvalidaException;
 import com.tecsup.app.micro.order.application.AvanzarSagaUseCase;
 import com.tecsup.app.micro.order.infrastructure.messaging.dto.EntregaEstadoCambiadoDTO;
-import com.tecsup.app.micro.order.infrastructure.dlq.DeadLetterQueue;
+import com.tecsup.app.micro.shared.dlq.DeadLetterQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.DltHandler;

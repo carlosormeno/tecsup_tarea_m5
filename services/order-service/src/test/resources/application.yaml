@@ -28,3 +28,6 @@ logging:
   level:
     root: WARN
     com.tecsup.app.micro.order: INFO
+
+seguridad:
+  rutas-publicas: /actuator/**, /swagger-ui.html, /swagger-ui/**, /v3/api-docs/**

@@ -166,3 +166,14 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+# =============================================================================
+# Seguridad: rutas sin JWT
+#
+# Ningún endpoint de negocio es público. Solo se abren los que no pueden
+# exigir token: actuator (Prometheus raspa cada 15 s y el JWT caduca en 1 h) y
+# Swagger (inservible en una demostración si hay que pegar un token a mano).
+# user-service añadirá /auth/** a esta lista.
+# =============================================================================
+seguridad:
+  rutas-publicas: /actuator/**, /swagger-ui.html, /swagger-ui/**, /v3/api-docs/**

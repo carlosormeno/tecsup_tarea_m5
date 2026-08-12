@@ -1,0 +1,30 @@
+# =============================================================================
+# Configuración solo para pruebas.
+# H2 en modo PostgreSQL, Flyway desactivado: aquí se prueba el mapeo, no las
+# migraciones.
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:h2:mem:catalogdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+jwt:
+  secret: clave-de-pruebas-con-al-menos-32-caracteres-para-HS256
+
+seguridad:
+  rutas-publicas: /actuator/**, /swagger-ui.html, /swagger-ui/**, /v3/api-docs/**
+
+logging:
+  level:
+    root: WARN
+    com.tecsup.app.micro.catalog: INFO

@@ -1,19 +1,26 @@
 # =============================================================================
 # ETAPA 1: BUILD
-# Compila dentro de la imagen, así "podman-compose build" funciona sin
-# necesidad de correr "mvn package" antes.
+#
+# OJO: el contexto de build es ./services, NO ./services/order-service, porque
+# este servicio depende del módulo shared. En el compose se declara así:
+#
+#   build:
+#     context: ./services
+#     dockerfile: order-service/Dockerfile
+#
+# Se copia todo y se construye de una vez con -am (also make dependencies).
+# Se pierde algo de caché de capas respecto a copiar solo los pom primero, a
+# cambio de un build que no falla al resolver el módulo hermano.
 # =============================================================================
 FROM maven:3.9-eclipse-temurin-21-alpine AS build
 
 WORKDIR /build
 
-# Primero solo el pom: si no cambia, Podman reusa la capa de dependencias
-# y las siguientes construcciones no vuelven a descargar medio Maven Central.
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
+COPY shared shared
+COPY order-service order-service
 
-COPY src ./src
-RUN mvn -B clean package -DskipTests
+RUN mvn -B -pl order-service -am clean package -DskipTests
 
 # =============================================================================
 # ETAPA 2: RUNTIME
@@ -24,7 +31,7 @@ WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring
 
-COPY --from=build /build/target/*.jar /app/order-service.jar
+COPY --from=build /build/order-service/target/*.jar /app/order-service.jar
 
 # Carpeta donde el servicio escribe el log que después lee Promtail
 RUN mkdir -p /logs && chown -R spring:spring /logs /app

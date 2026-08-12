@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.6</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.tecsup.app.micro</groupId>
+    <artifactId>servicios</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>servicios</name>
+    <description>Sistema de pedidos de comida - microservicios</description>
+
+    <!--
+      POM agregador.
+
+      Existe por una sola razón: permitir que los servicios compartan
+      `shared`, un módulo con fontanería técnica (DLQ y validación de
+      JWT) que sería byte a byte idéntica en los cinco.
+
+      LO QUE SE COMPARTE Y LO QUE NO (ver ADR-008):
+        - Compartido: código técnico sin significado de negocio.
+        - Nunca compartido: eventos, DTOs de contrato, modelos de dominio y
+          puertos. Cada servicio define los suyos. Compartirlos convertiría
+          esto en un monolito distribuido, donde cambiar un campo obliga a
+          recompilar y redesplegar los cinco servicios a la vez.
+    -->
+    <modules>
+        <module>shared</module>
+        <module>catalog-service</module>
+        <module>delivery-service</module>
+        <module>order-service</module>
+        <module>payment-service</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <springdoc.version>2.8.6</springdoc.version>
+        <jjwt.version>0.12.6</jjwt.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.tecsup.app.micro</groupId>
+                <artifactId>shared</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

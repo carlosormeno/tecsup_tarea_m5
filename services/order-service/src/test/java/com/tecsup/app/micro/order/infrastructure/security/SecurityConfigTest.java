@@ -1,5 +1,9 @@
 package com.tecsup.app.micro.order.infrastructure.security;
 
+import com.tecsup.app.micro.shared.security.JwtAuthenticationFilter;
+import com.tecsup.app.micro.shared.security.JwtTokenProvider;
+import com.tecsup.app.micro.shared.security.SecurityConfig;
+
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;

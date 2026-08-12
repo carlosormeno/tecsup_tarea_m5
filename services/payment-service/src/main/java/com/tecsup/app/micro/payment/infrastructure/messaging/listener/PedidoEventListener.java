@@ -1,0 +1,89 @@
+package com.tecsup.app.micro.payment.infrastructure.messaging.listener;
+
+import com.tecsup.app.micro.payment.application.ProcesarPagoUseCase;
+import com.tecsup.app.micro.payment.application.ReembolsarPagoUseCase;
+import com.tecsup.app.micro.payment.domain.exception.PagoNoEncontradoException;
+import com.tecsup.app.micro.payment.domain.exception.TransicionInvalidaException;
+import com.tecsup.app.micro.shared.dlq.DeadLetterQueue;
+import com.tecsup.app.micro.payment.infrastructure.messaging.Topics;
+import com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCanceladoDTO;
+import com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCreadoDTO;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.DltHandler;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.stereotype.Component;
+
+/**
+ * Adaptador de entrada: eventos que publica Pedidos.
+ *
+ * Solo traduce del mundo de Kafka a los puertos de entrada. Ni una regla de
+ * negocio vive aquí.
+ *
+ * Política de reintentos: 4 entregas en total (la original más 3), con backoff
+ * exponencial de 2s. En `exclude` van los fallos deterministas, que no ganan
+ * nada reintentándose y pasan directo a la DLT.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class PedidoEventListener {
+
+    private final ProcesarPagoUseCase procesarPago;
+    private final ReembolsarPagoUseCase reembolsarPago;
+    private final DeadLetterQueue dlq;
+
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 2000, multiplier = 2.0),
+            autoCreateTopics = "true",
+            dltTopicSuffix = Topics.SUFIJO_DLT,
+            exclude = {
+                    PagoNoEncontradoException.class,
+                    TransicionInvalidaException.class,
+                    IllegalArgumentException.class
+            })
+    @KafkaListener(topics = Topics.PEDIDO_CREADO, groupId = "pagos-group")
+    public void alCrearsePedido(PedidoCreadoDTO evento) {
+        log.info("Recibido pedido.creado para el pedido {} por {}",
+                evento.pedidoId(), evento.total());
+
+        procesarPago.procesar(evento.pedidoId(), evento.clienteId(), evento.total());
+    }
+
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 2000, multiplier = 2.0),
+            autoCreateTopics = "true",
+            dltTopicSuffix = Topics.SUFIJO_DLT,
+            exclude = {
+                    PagoNoEncontradoException.class,
+                    TransicionInvalidaException.class,
+                    IllegalArgumentException.class
+            })
+    @KafkaListener(topics = Topics.PEDIDO_CANCELADO, groupId = "pagos-group")
+    public void alCancelarsePedido(PedidoCanceladoDTO evento) {
+        log.info("Recibido pedido.cancelado para el pedido {} (huboCobro={})",
+                evento.pedidoId(), evento.huboCobro());
+
+        // No se filtra por huboCobro: el caso de uso ya tolera que no exista
+        // pago o que esté rechazado. Decidirlo aquí sería meter regla de
+        // negocio en el adaptador.
+        reembolsarPago.reembolsarPorPedido(evento.pedidoId(), evento.motivo());
+    }
+
+    /** Último recurso: se agotaron los reintentos. */
+    @DltHandler
+    public void alAgotarseLosReintentos(
+            Object evento,
+            @Header(name = KafkaHeaders.DLT_ORIGINAL_TOPIC, required = false) String topicOrigen,
+            @Header(name = KafkaHeaders.DLT_ORIGINAL_OFFSET, required = false) byte[] offsetOrigen,
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String error) {
+
+        dlq.registrarDesdeDlt(evento, topicOrigen, offsetOrigen, error);
+    }
+}
