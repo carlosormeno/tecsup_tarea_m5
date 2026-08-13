@@ -51,7 +51,7 @@ public class SecurityConfig {
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter,
                           @Value("${seguridad.rutas-publicas}") String[] rutasPublicas,
-                          @Value("${seguridad.origenes-permitidos:http://localhost:5173}")
+                          @Value("${seguridad.origenes-permitidos:http://localhost:*,http://127.0.0.1:*}")
                           List<String> origenesPermitidos) {
         this.jwtFilter = jwtFilter;
         this.rutasPublicas = rutasPublicas;
@@ -92,7 +92,17 @@ public class SecurityConfig {
      */
     private CorsConfigurationSource configuracionCors() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(origenesPermitidos);
+
+        // Patrones y no orígenes exactos, por dos despliegues con puertos
+        // distintos: 5173 con Vite en desarrollo, 8000 tras el Ingress.
+        //
+        // OJO CON ALGO QUE NO ES EVIDENTE: un POST manda la cabecera Origin
+        // AUNQUE sea del mismo origen. Con el front servido por el Ingress, el
+        // navegador envía Origin: http://localhost:8000 y este filtro la valida
+        // igualmente; si no está permitida, responde 403 "Invalid CORS request"
+        // pese a no ser una petición cross-origin. Con curl no se reproduce,
+        // porque curl no manda Origin.
+        config.setAllowedOriginPatterns(origenesPermitidos);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setMaxAge(3600L);   // cachea el preflight una hora
