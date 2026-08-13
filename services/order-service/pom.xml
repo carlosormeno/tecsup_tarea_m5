@@ -65,6 +65,25 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
+        <!--
+            Circuit breaker para la única llamada síncrona del sistema
+            (Pedidos -> Catálogo, ver ADR-005). Solo este servicio lo necesita:
+            los otros cuatro se comunican exclusivamente por eventos, donde el
+            mecanismo de protección es el reintento con DLQ (ADR-006), no un
+            circuito. Añadirlo a los cinco sería ceremonia.
+
+            Arrastra spring-boot-starter-aop, que es lo que hace funcionar la
+            anotación @CircuitBreaker.
+        -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- Observabilidad: métricas, trazas y logs -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
