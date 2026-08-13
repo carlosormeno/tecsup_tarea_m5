@@ -49,7 +49,7 @@ public class KafkaTopicsConfig {
     public KafkaAdmin.NewTopics topicsDeReintento() {
         return TopicsDeReintento.para(PARTICIONES_REINTENTO, REPLICAS_REINTENTO,
                 Topics.SUFIJO_DLT,
-                Topics.PEDIDO_CREADO,
+                Topics.PEDIDO_PAGO_SOLICITADO,
                 Topics.PEDIDO_CANCELADO);
     }
 }

@@ -2,8 +2,6 @@ package com.tecsup.app.micro.order.application;
 
 import com.tecsup.app.micro.order.domain.client.CatalogoPort;
 import com.tecsup.app.micro.order.domain.repository.PedidoRepository;
-import com.tecsup.app.micro.order.domain.event.PublicadorEventos;
-import com.tecsup.app.micro.order.domain.event.PedidoCreado;
 import com.tecsup.app.micro.order.domain.model.LineaPedido;
 import com.tecsup.app.micro.order.domain.model.Pedido;
 import com.tecsup.app.micro.order.domain.model.ProductoCatalogo;
@@ -14,20 +12,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Caso de uso: crear un pedido y arrancar la saga.
+ * Caso de uso: crear un pedido.
  *
- * NOTA SOBRE CONSISTENCIA (ver ADR-007): guardar en Postgres y publicar en
- * Kafka son dos escrituras sin transacción común. Si la BD confirma y el
- * broker falla, el pedido queda en un estado que nadie más conoce y la saga
- * se detiene. La solución formal es el patrón outbox; aquí se asume el riesgo
- * de forma consciente y se documenta.
+ * NO publica ningún evento ni arranca la saga. Un pedido recién creado es una
+ * intención del cliente: existe, se puede consultar y se puede cancelar sin
+ * consecuencias. La saga arranca cuando el cliente decide pagar, en
+ * {@link PagarPedidoUseCaseImpl}.
+ *
+ * Que este caso de uso no dependa de PublicadorEventos es la prueba de esa
+ * separación: crear no le cuenta nada a nadie.
  */
 @Slf4j
 @RequiredArgsConstructor
 public class CrearPedidoUseCaseImpl implements CrearPedidoUseCase {
 
     private final PedidoRepository repositorio;
-    private final PublicadorEventos publicador;
     private final CatalogoPort catalogo;
 
     @Override
@@ -40,10 +39,9 @@ public class CrearPedidoUseCaseImpl implements CrearPedidoUseCase {
         Pedido pedido = repositorio.guardar(
                 Pedido.crear(comando.clienteId(), comando.direccionEntrega(), lineas));
 
-        log.info("Pedido {} creado por el cliente {} por un total de {}",
+        log.info("Pedido {} creado por el cliente {} por un total de {}: a la espera del pago",
                 pedido.getId(), pedido.getClienteId(), pedido.total());
 
-        publicador.publicar(PedidoCreado.de(pedido));
         return pedido;
     }
 

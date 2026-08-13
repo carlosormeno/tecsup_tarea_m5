@@ -7,6 +7,7 @@ import com.tecsup.app.micro.shared.security.SecurityConfig;
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;
+import com.tecsup.app.micro.order.application.PagarPedidoUseCase;
 import com.tecsup.app.micro.order.infrastructure.web.controller.PedidoController;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -46,6 +47,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private CrearPedidoUseCase crearPedido;
+
+    @MockitoBean
+    private PagarPedidoUseCase pagarPedido;
 
     @MockitoBean
     private ConsultarPedidosUseCase consultarPedidos;

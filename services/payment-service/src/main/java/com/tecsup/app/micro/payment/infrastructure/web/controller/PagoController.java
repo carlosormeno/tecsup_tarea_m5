@@ -21,7 +21,7 @@ import java.util.UUID;
  * Adaptador de entrada REST.
  *
  * No expone ningún endpoint para cobrar: el cobro lo dispara el evento
- * `pedido.creado`, nunca una llamada HTTP. Aquí solo hay consultas y el
+ * `pedido.pago-solicitado`, nunca una llamada HTTP. Aquí solo hay consultas y el
  * reembolso manual, que es una operación administrativa.
  */
 @RestController

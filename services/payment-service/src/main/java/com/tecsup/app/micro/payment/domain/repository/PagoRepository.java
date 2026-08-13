@@ -15,7 +15,7 @@ public interface PagoRepository {
 
     /**
      * Clave de la idempotencia: antes de cobrar se comprueba si ya existe un
-     * pago para ese pedido. Si `pedido.creado` llega dos veces, el segundo se
+     * pago para ese pedido. Si `pedido.pago-solicitado` llega dos veces, el segundo se
      * ignora en lugar de cobrar por duplicado.
      */
     Optional<Pago> buscarPorPedido(UUID pedidoId);

@@ -8,8 +8,8 @@ import java.util.UUID;
 /**
  * Puerto de entrada: cobrar un pedido.
  *
- * Lo invoca el consumidor de `pedido.creado`. Recibe datos planos, nunca la
- * clase del evento: si este puerto conociera `PedidoCreadoDTO`, la aplicación
+ * Lo invoca el consumidor de `pedido.pago-solicitado`. Recibe datos planos, nunca la
+ * clase del evento: si este puerto conociera `PagoSolicitadoDTO`, la aplicación
  * dependería de la infraestructura.
  */
 public interface ProcesarPagoUseCase {

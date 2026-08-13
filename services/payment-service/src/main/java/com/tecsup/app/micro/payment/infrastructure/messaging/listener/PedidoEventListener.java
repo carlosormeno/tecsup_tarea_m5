@@ -6,8 +6,8 @@ import com.tecsup.app.micro.payment.domain.exception.PagoNoEncontradoException;
 import com.tecsup.app.micro.payment.domain.exception.TransicionInvalidaException;
 import com.tecsup.app.micro.shared.dlq.DeadLetterQueue;
 import com.tecsup.app.micro.payment.infrastructure.messaging.Topics;
+import com.tecsup.app.micro.payment.infrastructure.messaging.dto.PagoSolicitadoDTO;
 import com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCanceladoDTO;
-import com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCreadoDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -49,9 +49,9 @@ public class PedidoEventListener {
                     TransicionInvalidaException.class,
                     IllegalArgumentException.class
             })
-    @KafkaListener(topics = Topics.PEDIDO_CREADO, groupId = "pagos-group")
-    public void alCrearsePedido(PedidoCreadoDTO evento) {
-        log.info("Recibido pedido.creado para el pedido {} por {}",
+    @KafkaListener(topics = Topics.PEDIDO_PAGO_SOLICITADO, groupId = "pagos-group")
+    public void alSolicitarsePago(PagoSolicitadoDTO evento) {
+        log.info("Recibido pedido.pago-solicitado para el pedido {} por {}",
                 evento.pedidoId(), evento.total());
 
         procesarPago.procesar(evento.pedidoId(), evento.clienteId(), evento.total());

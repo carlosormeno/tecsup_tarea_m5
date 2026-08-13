@@ -15,10 +15,11 @@ public class OpenApiConfig {
                 .version("1.0")
                 .description("""
                         Cobra y reembolsa. El cobro NO se dispara por HTTP:
-                        lo desencadena el evento pedido.creado.
+                        lo desencadena el evento pedido.pago-solicitado, que
+                        publica Pedidos cuando el cliente pulsa «pagar».
 
                         Publica: pago.confirmado, pago.rechazado
-                        Consume: pedido.creado, pedido.cancelado
+                        Consume: pedido.pago-solicitado, pedido.cancelado
                         """));
     }
 }

@@ -68,7 +68,7 @@ class ProcesarPagoUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("un pedido.creado duplicado no cobra dos veces ni publica de nuevo")
+    @DisplayName("un pedido.pago-solicitado duplicado no cobra dos veces ni publica de nuevo")
     void idempotencia() {
         procesarPago.procesar(pedidoId, 1L, new BigDecimal("86.80"));
         publicador.limpiar();

@@ -61,7 +61,7 @@ spring:
         spring.json.trusted.packages: com.tecsup.app.micro.payment.*
         # Nombres lógicos que publica order-service -> DTO propio de este servicio
         spring.json.type.mapping: >
-          pedidoCreado:com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCreadoDTO,
+          pagoSolicitado:com.tecsup.app.micro.payment.infrastructure.messaging.dto.PagoSolicitadoDTO,
           pedidoCancelado:com.tecsup.app.micro.payment.infrastructure.messaging.dto.PedidoCanceladoDTO
 
     # Sin esto la traza se corta en el broker y Zipkin mostraría el cobro como

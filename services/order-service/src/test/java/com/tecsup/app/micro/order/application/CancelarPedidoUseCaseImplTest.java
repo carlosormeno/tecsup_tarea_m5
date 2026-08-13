@@ -21,6 +21,7 @@ class CancelarPedidoUseCaseImplTest {
     private Fakes.FakeRepositorio repositorio;
     private Fakes.FakePublicador publicador;
     private CancelarPedidoUseCaseImpl cancelar;
+    private PagarPedidoUseCaseImpl pagar;
     private AvanzarSagaUseCaseImpl saga;
     private UUID pedidoId;
 
@@ -29,10 +30,11 @@ class CancelarPedidoUseCaseImplTest {
         repositorio = new Fakes.FakeRepositorio();
         publicador = new Fakes.FakePublicador();
         cancelar = new CancelarPedidoUseCaseImpl(repositorio, publicador);
+        pagar = new PagarPedidoUseCaseImpl(repositorio, publicador);
         saga = new AvanzarSagaUseCaseImpl(repositorio, publicador);
 
         Pedido pedido = new CrearPedidoUseCaseImpl(
-                repositorio, publicador, new Fakes.FakeCatalogo().conProductosDePrueba())
+                repositorio, new Fakes.FakeCatalogo().conProductosDePrueba())
                 .crear(new ComandoCrearPedido(1L, "Av. Arequipa 123",
                         List.of(new ComandoCrearPedido.ItemSolicitado(10L, 2))));
 
@@ -52,8 +54,23 @@ class CancelarPedidoUseCaseImplTest {
     }
 
     @Test
+    @DisplayName("cancelar mientras el cobro está en vuelo tampoco pide reembolso")
+    void cancelarConElPagoEnProceso() {
+        pagar.pagar(pedidoId);
+        publicador.limpiar();
+
+        cancelar.cancelar(pedidoId, "Me arrepentí a medio pagar");
+
+        // Todavía no hay dinero cobrado. Si el cobro terminara igualmente, el
+        // reembolso de Pagos tolera que no haya pago que devolver.
+        PedidoCancelado evento = (PedidoCancelado) publicador.publicados.get(0);
+        assertThat(evento.huboCobro()).isFalse();
+    }
+
+    @Test
     @DisplayName("cancelar después de pagar marca que hay que reembolsar")
     void cancelarConCobro() {
+        pagar.pagar(pedidoId);
         saga.pagoConfirmado(pedidoId, "tx-001");
         publicador.limpiar();
 

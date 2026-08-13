@@ -15,8 +15,8 @@ public class KafkaTopicsConfig {
     private static final short REPLICAS = 1;   // un solo broker en desarrollo
 
     @Bean
-    public NewTopic pedidoCreado() {
-        return TopicBuilder.name(Topics.PEDIDO_CREADO)
+    public NewTopic pedidoPagoSolicitado() {
+        return TopicBuilder.name(Topics.PEDIDO_PAGO_SOLICITADO)
                 .partitions(PARTICIONES).replicas(REPLICAS).build();
     }
 

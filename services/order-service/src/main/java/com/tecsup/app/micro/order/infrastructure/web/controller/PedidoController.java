@@ -4,6 +4,7 @@ import com.tecsup.app.micro.order.domain.model.Pedido;
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;
+import com.tecsup.app.micro.order.application.PagarPedidoUseCase;
 import com.tecsup.app.micro.order.infrastructure.web.dto.CrearPedidoRequest;
 import com.tecsup.app.micro.order.infrastructure.web.dto.PedidoResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,11 +31,12 @@ import java.util.UUID;
 public class PedidoController {
 
     private final CrearPedidoUseCase crearPedido;
+    private final PagarPedidoUseCase pagarPedido;
     private final ConsultarPedidosUseCase consultarPedidos;
     private final CancelarPedidoUseCase cancelarPedido;
 
     @PostMapping
-    @Operation(summary = "Crea un pedido y arranca la saga")
+    @Operation(summary = "Crea un pedido. Queda en CREADO, a la espera del pago")
     public ResponseEntity<PedidoResponse> crear(@Valid @RequestBody CrearPedidoRequest peticion) {
         List<CrearPedidoUseCase.ComandoCrearPedido.ItemSolicitado> items = peticion.items().stream()
                 .map(i -> new CrearPedidoUseCase.ComandoCrearPedido.ItemSolicitado(
@@ -45,6 +47,23 @@ public class PedidoController {
                 peticion.clienteId(), peticion.direccionEntrega(), items));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(PedidoResponse.de(pedido));
+    }
+
+    /**
+     * Arranca la saga.
+     *
+     * Devuelve 200 con el pedido en `PAGO_EN_PROCESO`, no el resultado del
+     * cobro: quien decide si el pago sale bien es Pagos, y responde por evento
+     * unos milisegundos después. El cliente ve el resultado consultando el
+     * pedido.
+     *
+     * Un segundo intento sobre el mismo pedido devuelve 409: la transición ya
+     * no es válida.
+     */
+    @PostMapping("/{id}/pagar")
+    @Operation(summary = "Solicita el cobro del pedido y arranca la saga")
+    public ResponseEntity<PedidoResponse> pagar(@PathVariable UUID id) {
+        return ResponseEntity.ok(PedidoResponse.de(pagarPedido.pagar(id)));
     }
 
     @GetMapping("/{id}")

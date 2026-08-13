@@ -50,10 +50,10 @@ spring:
       properties:
         # Nombres lógicos en la cabecera de tipo, en vez del nombre de la clase
         # Java. Sin esto, el consumidor recibiría
-        # "com.tecsup.app.micro.order.domain.event.PedidoCreado" e intentaría
+        # "com.tecsup.app.micro.order.domain.event.PagoSolicitado" e intentaría
         # instanciar una clase que en su servicio no existe.
         spring.json.type.mapping: >
-          pedidoCreado:com.tecsup.app.micro.order.domain.event.PedidoCreado,
+          pagoSolicitado:com.tecsup.app.micro.order.domain.event.PagoSolicitado,
           pedidoConfirmado:com.tecsup.app.micro.order.domain.event.PedidoConfirmado,
           pedidoEntregado:com.tecsup.app.micro.order.domain.event.PedidoEntregado,
           pedidoCancelado:com.tecsup.app.micro.order.domain.event.PedidoCancelado
@@ -89,6 +89,34 @@ spring:
 catalogo:
   service:
     url: ${CATALOGO_SERVICE_URL:http://localhost:8082}
+
+# =============================================================================
+# Circuit breaker sobre esa única llamada síncrona (ADR-005)
+#
+# Con Catálogo caído y sin circuito, cada petición espera los 3 s del timeout
+# antes de fallar. Bajo carga esas esperas se apilan y agotan el pool de hilos:
+# un servicio caído se lleva por delante a otro que está sano. Con el circuito
+# abierto, la llamada ni se intenta.
+#
+# ignore-exceptions es la línea más importante del bloque: que un producto no
+# exista es una respuesta CORRECTA del catálogo, no un fallo suyo. Sin esta
+# exclusión, unos cuantos productos inexistentes abrirían el circuito y
+# bloquearían las compras válidas.
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalogo:
+        register-health-indicator: true       # sale en /actuator/health
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5            # no abrir por los 2 primeros fallos
+        failure-rate-threshold: 50            # 50% de fallos -> abrir
+        wait-duration-in-open-state: 10s      # abierto 10 s, luego deja pasar unas pocas
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.tecsup.app.micro.order.domain.exception.ProductoNoDisponibleException
 
 # =============================================================================
 # Seguridad

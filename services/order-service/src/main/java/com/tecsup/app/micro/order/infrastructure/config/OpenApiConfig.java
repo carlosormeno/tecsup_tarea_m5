@@ -16,7 +16,10 @@ public class OpenApiConfig {
                 .description("""
                         Orquestador de la saga de pedidos.
 
-                        Publica: pedido.creado, pedido.confirmado, pedido.entregado, pedido.cancelado
+                        Crear el pedido no cobra nada: la saga arranca en
+                        POST /api/pedidos/{id}/pagar.
+
+                        Publica: pedido.pago-solicitado, pedido.confirmado, pedido.entregado, pedido.cancelado
                         Consume: pago.confirmado, pago.rechazado, entrega.estado-cambiado
                         """));
     }

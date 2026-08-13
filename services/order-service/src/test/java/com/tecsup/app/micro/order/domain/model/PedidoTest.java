@@ -37,15 +37,20 @@ class PedidoTest {
         assertThat(pedido.total()).isEqualByComparingTo(new BigDecimal("86.80"));
     }
 
-    @Test
-    @DisplayName("el camino feliz recorre toda la máquina de estados")
-    void caminoFeliz() {
+    private Pedido unPedidoEntregado() {
         Pedido pedido = unPedido();
-
+        pedido.transicionarA(EstadoPedido.PAGO_EN_PROCESO, null);
         pedido.transicionarA(EstadoPedido.PAGADO, "pago-123");
         pedido.transicionarA(EstadoPedido.EN_PREPARACION, null);
         pedido.transicionarA(EstadoPedido.EN_CAMINO, null);
         pedido.transicionarA(EstadoPedido.ENTREGADO, null);
+        return pedido;
+    }
+
+    @Test
+    @DisplayName("el camino feliz recorre toda la máquina de estados")
+    void caminoFeliz() {
+        Pedido pedido = unPedidoEntregado();
 
         assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.ENTREGADO);
         assertThat(pedido.getEstado().esFinal()).isTrue();
@@ -62,13 +67,42 @@ class PedidoTest {
     }
 
     @Test
+    @DisplayName("un pedido no puede darse por pagado sin haber pasado por el cobro")
+    void exigePasarPorElCobro() {
+        Pedido pedido = unPedido();
+
+        // Esta es la regla que hace que el botón de pagar no sea decorativo:
+        // el único camino a PAGADO pasa por PAGO_EN_PROCESO, y a ese estado
+        // solo se llega solicitando el cobro.
+        assertThatThrownBy(() -> pedido.transicionarA(EstadoPedido.PAGADO, "pago-123"))
+                .isInstanceOf(TransicionInvalidaException.class);
+    }
+
+    @Test
+    @DisplayName("pagar dos veces el mismo pedido no es una transición válida")
+    void noSePagaDosVeces() {
+        Pedido pedido = unPedido();
+        pedido.transicionarA(EstadoPedido.PAGO_EN_PROCESO, null);
+
+        // El doble clic en «pagar» muere aquí, en el dominio, no en el navegador
+        assertThatThrownBy(() -> pedido.transicionarA(EstadoPedido.PAGO_EN_PROCESO, null))
+                .isInstanceOf(TransicionInvalidaException.class);
+    }
+
+    @Test
+    @DisplayName("solo a partir de PAGADO hay dinero que devolver")
+    void implicaCobro() {
+        assertThat(EstadoPedido.CREADO.implicaCobro()).isFalse();
+        // El cobro puede estar en vuelo: se trata como «todavía no»
+        assertThat(EstadoPedido.PAGO_EN_PROCESO.implicaCobro()).isFalse();
+        assertThat(EstadoPedido.PAGADO.implicaCobro()).isTrue();
+        assertThat(EstadoPedido.EN_CAMINO.implicaCobro()).isTrue();
+    }
+
+    @Test
     @DisplayName("un pedido entregado ya no admite cambios")
     void estadoFinalEsFinal() {
-        Pedido pedido = unPedido();
-        pedido.transicionarA(EstadoPedido.PAGADO, null);
-        pedido.transicionarA(EstadoPedido.EN_PREPARACION, null);
-        pedido.transicionarA(EstadoPedido.EN_CAMINO, null);
-        pedido.transicionarA(EstadoPedido.ENTREGADO, null);
+        Pedido pedido = unPedidoEntregado();
 
         assertThatThrownBy(() -> pedido.transicionarA(EstadoPedido.CANCELADO, "tarde"))
                 .isInstanceOf(TransicionInvalidaException.class);

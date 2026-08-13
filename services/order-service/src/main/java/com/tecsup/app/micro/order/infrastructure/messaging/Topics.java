@@ -13,7 +13,8 @@ public final class Topics {
     }
 
     // Publica
-    public static final String PEDIDO_CREADO = "pedido.creado";
+    /** Lo dispara el cliente al pagar, no la creación del pedido. */
+    public static final String PEDIDO_PAGO_SOLICITADO = "pedido.pago-solicitado";
     public static final String PEDIDO_CONFIRMADO = "pedido.confirmado";
     public static final String PEDIDO_ENTREGADO = "pedido.entregado";
     public static final String PEDIDO_CANCELADO = "pedido.cancelado";

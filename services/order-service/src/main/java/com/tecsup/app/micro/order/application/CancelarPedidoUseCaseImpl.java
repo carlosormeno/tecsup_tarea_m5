@@ -24,10 +24,11 @@ public class CancelarPedidoUseCaseImpl implements CancelarPedidoUseCase {
     public Pedido cancelar(UUID pedidoId, String motivo) {
         Pedido pedido = repositorio.obtener(pedidoId);
 
-        // Si ya salió de CREADO es que el cobro se hizo, y Pagos tendrá que
+        // Si el pedido llegó a PAGADO hay dinero cobrado y Pagos tendrá que
         // reembolsar. El evento lleva ese dato para que Pagos no tenga que
-        // deducirlo por su cuenta.
-        boolean huboCobro = !pedido.estaEn(EstadoPedido.CREADO);
+        // deducirlo por su cuenta. Se lee ANTES de la transición, claro: después
+        // el estado ya es CANCELADO y no diría nada.
+        boolean huboCobro = pedido.getEstado().implicaCobro();
 
         pedido.transicionarA(EstadoPedido.CANCELADO, motivo);
         repositorio.guardar(pedido);

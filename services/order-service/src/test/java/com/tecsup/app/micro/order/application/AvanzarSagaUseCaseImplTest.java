@@ -31,11 +31,15 @@ class AvanzarSagaUseCaseImplTest {
         saga = new AvanzarSagaUseCaseImpl(repositorio, publicador);
 
         Pedido pedido = new CrearPedidoUseCaseImpl(
-                repositorio, publicador, new Fakes.FakeCatalogo().conProductosDePrueba())
+                repositorio, new Fakes.FakeCatalogo().conProductosDePrueba())
                 .crear(new ComandoCrearPedido(1L, "Av. Arequipa 123",
                         List.of(new ComandoCrearPedido.ItemSolicitado(10L, 2))));
 
         pedidoId = pedido.getId();
+
+        // Todas estas pruebas parten de un pedido cuyo cobro ya se solicitó:
+        // sin ese paso, Pagos no habría publicado nada a lo que reaccionar.
+        new PagarPedidoUseCaseImpl(repositorio, publicador).pagar(pedidoId);
         publicador.limpiar();
     }
 

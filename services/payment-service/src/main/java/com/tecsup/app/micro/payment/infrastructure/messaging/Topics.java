@@ -14,7 +14,8 @@ public final class Topics {
     public static final String PAGO_RECHAZADO = "pago.rechazado";
 
     // Consume
-    public static final String PEDIDO_CREADO = "pedido.creado";
+    /** Lo publica Pedidos cuando el cliente pulsa «pagar». Es lo que dispara el cobro. */
+    public static final String PEDIDO_PAGO_SOLICITADO = "pedido.pago-solicitado";
     public static final String PEDIDO_CANCELADO = "pedido.cancelado";
 
     /**

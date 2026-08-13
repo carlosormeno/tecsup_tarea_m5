@@ -9,6 +9,8 @@ import com.tecsup.app.micro.order.domain.model.Pedido;
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;
+import com.tecsup.app.micro.order.application.PagarPedidoUseCase;
+import com.tecsup.app.micro.order.domain.exception.TransicionInvalidaException;
 import com.tecsup.app.micro.shared.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +57,9 @@ class PedidoControllerTest {
     private CrearPedidoUseCase crearPedido;
 
     @MockitoBean
+    private PagarPedidoUseCase pagarPedido;
+
+    @MockitoBean
     private ConsultarPedidosUseCase consultarPedidos;
 
     @MockitoBean
@@ -97,6 +102,31 @@ class PedidoControllerTest {
                 .andExpect(jsonPath("$.total").value(71.80))
                 .andExpect(jsonPath("$.lineas[0].nombreProducto").value("Pizza margarita"))
                 .andExpect(jsonPath("$.lineas[0].subtotal").value(71.80));
+    }
+
+    @Test
+    @DisplayName("POST /api/pedidos/{id}/pagar devuelve el pedido en PAGO_EN_PROCESO")
+    void pagar() throws Exception {
+        Pedido pedido = unPedido();
+        pedido.transicionarA(EstadoPedido.PAGO_EN_PROCESO, "Pago solicitado por el cliente");
+        given(pagarPedido.pagar(any(UUID.class))).willReturn(pedido);
+
+        mockMvc.perform(post("/api/pedidos/{id}/pagar", pedido.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("PAGO_EN_PROCESO"));
+    }
+
+    @Test
+    @DisplayName("pagar dos veces el mismo pedido devuelve 409")
+    void pagarDosVeces() throws Exception {
+        UUID id = UUID.randomUUID();
+        willThrow(new TransicionInvalidaException(
+                id, EstadoPedido.PAGO_EN_PROCESO, EstadoPedido.PAGO_EN_PROCESO))
+                .given(pagarPedido).pagar(any(UUID.class));
+
+        mockMvc.perform(post("/api/pedidos/{id}/pagar", id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Transición de estado no permitida"));
     }
 
     @Test

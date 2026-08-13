@@ -4,6 +4,8 @@ import com.tecsup.app.micro.order.application.AvanzarSagaUseCase;
 import com.tecsup.app.micro.order.application.CancelarPedidoUseCase;
 import com.tecsup.app.micro.order.application.ConsultarPedidosUseCase;
 import com.tecsup.app.micro.order.application.CrearPedidoUseCase;
+import com.tecsup.app.micro.order.application.PagarPedidoUseCase;
+import com.tecsup.app.micro.order.application.PagarPedidoUseCaseImpl;
 import com.tecsup.app.micro.order.domain.client.CatalogoPort;
 import com.tecsup.app.micro.order.domain.repository.PedidoRepository;
 import com.tecsup.app.micro.order.domain.event.PublicadorEventos;
@@ -19,9 +21,14 @@ public class BeanConfiguration {
 
     @Bean
     public CrearPedidoUseCase crearPedidoUseCase(PedidoRepository repositorio,
-                                                 PublicadorEventos publicador,
                                                  CatalogoPort catalogo) {
-        return new CrearPedidoUseCaseImpl(repositorio, publicador, catalogo);
+        return new CrearPedidoUseCaseImpl(repositorio, catalogo);
+    }
+
+    @Bean
+    public PagarPedidoUseCase pagarPedidoUseCase(PedidoRepository repositorio,
+                                                 PublicadorEventos publicador) {
+        return new PagarPedidoUseCaseImpl(repositorio, publicador);
     }
 
     @Bean

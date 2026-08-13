@@ -3,8 +3,8 @@ package com.tecsup.app.micro.order.infrastructure.messaging;
 import com.tecsup.app.micro.order.domain.event.PublicadorEventos;
 import com.tecsup.app.micro.order.domain.event.EventoDominio;
 import com.tecsup.app.micro.order.domain.event.PedidoCancelado;
+import com.tecsup.app.micro.order.domain.event.PagoSolicitado;
 import com.tecsup.app.micro.order.domain.event.PedidoConfirmado;
-import com.tecsup.app.micro.order.domain.event.PedidoCreado;
 import com.tecsup.app.micro.order.domain.event.PedidoEntregado;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +27,7 @@ import java.util.Map;
 public class KafkaEventPublisher implements PublicadorEventos {
 
     private static final Map<Class<? extends EventoDominio>, String> TOPIC_POR_EVENTO = Map.of(
-            PedidoCreado.class,     Topics.PEDIDO_CREADO,
+            PagoSolicitado.class,   Topics.PEDIDO_PAGO_SOLICITADO,
             PedidoConfirmado.class, Topics.PEDIDO_CONFIRMADO,
             PedidoEntregado.class,  Topics.PEDIDO_ENTREGADO,
             PedidoCancelado.class,  Topics.PEDIDO_CANCELADO);
