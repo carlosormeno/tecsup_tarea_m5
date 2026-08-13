@@ -301,14 +301,21 @@ y las cuatro herramientas de observabilidad.
 
 No son simultáneos: no caben dos veces en la misma máquina.
 
-**Lo que costó, y es la parte que merece contarse:** tres fallos que **solo
-existen en Kubernetes** y ninguno con un mensaje que apunte a su causa.
+**Lo que costó, y es la parte que merece contarse:** cinco fallos que **solo
+aparecen en este despliegue**, ninguno con un mensaje que apunte a su causa.
 
 | Síntoma | Causa | Corrección |
 |---|---|---|
 | Kafka muere al configurarse, log de 4 líneas | Kubernetes inyecta `KAFKA_PORT=tcp://…` por el Service homónimo, y la imagen de Confluent convierte toda variable `KAFKA_*` en propiedad del broker | `enableServiceLinks: false` |
 | Kafka no arranca nunca | Bloqueo circular: el broker se conecta a sí mismo por `kafka:9092`, el Service solo enruta a pods *Ready*, y no está *Ready* hasta que arranque | `publishNotReadyAddresses: true` |
 | `ErrImageNeverPull` con las imágenes cargadas | Podman antepone `localhost/`; containerd leía `pedidos/x:1.0` como `docker.io/pedidos/x:1.0` | `localhost/pedidos/<servicio>:1.0` |
+| `kind load` dice `image not present locally` con la imagen presente | El proveedor experimental de Podman normaliza el nombre de otra forma | `podman save` + `kind load image-archive` |
+| `403 Invalid CORS request` al entrar desde el propio Ingress | **Un `POST` manda `Origin` aunque sea del mismo origen**, y Spring lo valida igual | `setAllowedOriginPatterns` con `http://localhost:*` |
+
+El de CORS enseña algo que va más allá de Kubernetes: **una API se verifica
+desde el cliente que la va a usar**. Todas las comprobaciones del Ingress hechas
+con `curl` daban `200` sobre un camino que el navegador rechazaba, porque curl no
+envía la cabecera `Origin`.
 
 Y uno que no era de Kubernetes pero salió ahí: **los cinco `Dockerfile` nunca se
 habían llegado a construir.** Copiaban solo `pom.xml`, `shared` y su módulo,

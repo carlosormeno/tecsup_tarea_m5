@@ -112,8 +112,8 @@ Helm — que en una corrección importa.
   broker o base de datos.
 - **Sin persistencia real**: Zipkin guarda en memoria y el clúster se recrea con
   frecuencia.
-- **Tres fallos que solo existen en Kubernetes**, ninguno con un mensaje de
-  error que apunte a su causa. Se detallan abajo porque son la parte
+- **Cinco fallos que solo aparecen en este despliegue**, ninguno con un mensaje
+  de error que apunte a su causa. Se detallan abajo porque son la parte
   transferible de este ADR.
 
 ### Riesgos aceptados
@@ -124,10 +124,10 @@ Helm — que en una corrección importa.
 | El clúster no sobrevive al reinicio de la máquina de Podman | Recrearlo son dos minutos y los manifiestos lo reconstruyen entero |
 | `imagePullPolicy: Never` obliga a cargar las imágenes a mano | Es lo correcto sin registro; con uno, sería `Always` y un `docker push` |
 
-## Lo que costó: tres fallos que no aparecen en compose
+## Lo que costó: cinco fallos que no aparecen en compose
 
 Se dejan escritos porque explican por qué los manifiestos son como son, y
-porque ninguno de los tres da un mensaje que lleve a su causa.
+porque ninguno da un mensaje que lleve a su causa.
 
 ### 1. Kafka muere al configurarse
 
@@ -159,6 +159,42 @@ el problema es el nombre.
 
 **Corrección:** `localhost/pedidos/<servicio>:1.0` en los seis manifiestos.
 
+### 4. `kind load docker-image` deja de encontrar imágenes que sí existen
+
+Tras reconstruir las imágenes, `kind load docker-image
+localhost/pedidos/user-service:1.0` responde **`image not present locally`**,
+mientras `podman image inspect` la resuelve sin problema —y por los dos nombres,
+con y sin el prefijo `localhost/`—.
+
+Es el proveedor experimental de Podman normalizando el nombre de otra forma. No
+merece la pena pelearse: kind tiene una segunda vía que evita la resolución de
+nombres por completo.
+
+**Corrección:** exportar y cargar el archivo.
+
+```bash
+podman save localhost/pedidos/user-service:1.0 -o /tmp/img.tar
+kind load image-archive /tmp/img.tar --name pedidos-comida
+```
+
+### 5. `403 Invalid CORS request` al entrar desde el propio Ingress
+
+El front servido por el Ingress hacía login contra su mismo origen y recibía un
+`403`. La causa no es evidente: **un `POST` manda la cabecera `Origin` aunque la
+petición sea del mismo origen**, y el filtro de CORS de Spring la valida
+igualmente contra la lista permitida, que solo contenía `http://localhost:5173`.
+
+Lo que lo hizo difícil de ver es que **con `curl` no se reproduce**: curl no
+envía `Origin`. Las comprobaciones del Ingress hechas con curl daban `200` sobre
+un camino que el navegador rechazaba.
+
+**Corrección:** `setAllowedOriginPatterns` con `http://localhost:*`, que cubre
+los dos despliegues —5173 con Vite y 8000 tras el Ingress— en lugar de una lista
+de orígenes exactos.
+
+**La lección, que vale más que la corrección:** una API se verifica desde el
+cliente que la va a usar. Un `200` en curl no prueba que el navegador pueda.
+
 ### Y uno que no era de Kubernetes, pero salió aquí
 
 Los cinco `Dockerfile` copiaban solo `pom.xml`, `shared` y su propio módulo,
@@ -179,4 +215,5 @@ Todo lo de esta tabla se comprobó en ejecución el 2026-08-12.
 | El Ingress enruta por prefijo al servicio correcto | `POST http://localhost:8000/auth/login` | `200` con token |
 | Prometheus descubre los cinco servicios | `/prometheus/api/v1/targets` | los 5, `up` |
 | Las tres interfaces responden bajo subruta | `/grafana`, `/zipkin`, `/prometheus` | `200`, `200`, `200` |
+| El login funciona **como lo hace el navegador** | `POST /auth/login` con cabecera `Origin` | `200` con token; el preflight `OPTIONS`, `200` |
 | No hizo falta tocar código de negocio | `git diff` del despliegue | solo manifiestos, `Dockerfile` y una variable del front |
