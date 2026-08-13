@@ -38,7 +38,11 @@ spec:
     spec:
       containers:
         - name: catalog-service
-          image: pedidos/catalog-service:1.0
+          # localhost/ es obligatorio con Podman: toda imagen construida en
+          # local queda con ese prefijo, y containerd NO lo añade por su cuenta.
+          # Sin él, `pedidos/x:1.0` se interpreta como `docker.io/pedidos/x:1.0`,
+          # que no existe en el nodo, y el pod queda en ErrImageNeverPull.
+          image: localhost/pedidos/catalog-service:1.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8082
@@ -84,12 +88,16 @@ spec:
             # a una ruta efímera: aquí no hay Promtail leyendo un volumen.
             - name: LOG_FILE
               value: "/tmp/catalog-service.log"
-            # La observabilidad (Prometheus, Zipkin, Loki, Grafana) se queda en
-            # el despliegue de Podman Compose. Con el muestreo a cero, los
-            # servicios no intentan exportar trazas a un Zipkin que aquí no
-            # existe, y no ensucian el log con avisos de conexión rechazada.
+            # Zipkin vive en el clúster (05-observabilidad.yaml). El muestreo
+            # al 100% es correcto en desarrollo; en producción se bajaría, pero
+            # aquí perder trazas haría inútil la demostración.
+            - name: ZIPKIN_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: ZIPKIN_URL
             - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
-              value: "0.0"
+              value: "1.0"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness

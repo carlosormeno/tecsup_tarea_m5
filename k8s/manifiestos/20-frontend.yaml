@@ -43,7 +43,11 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: pedidos/frontend:1.0
+          # localhost/ es obligatorio con Podman: toda imagen construida en
+          # local queda con ese prefijo, y containerd NO lo añade por su cuenta.
+          # Sin él, `pedidos/x:1.0` se interpreta como `docker.io/pedidos/x:1.0`,
+          # que no existe en el nodo, y el pod queda en ErrImageNeverPull.
+          image: localhost/pedidos/frontend:1.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080

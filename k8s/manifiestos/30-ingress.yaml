@@ -90,6 +90,31 @@ spec:
                 port:
                   number: 8085
 
+          # ---- Observabilidad: bajo el mismo origen, sin port-forward ----
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+
+          - path: /zipkin
+            pathType: Prefix
+            backend:
+              service:
+                name: zipkin
+                port:
+                  number: 9411
+
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+
           # Todo lo demás es el front
           - path: /
             pathType: Prefix
