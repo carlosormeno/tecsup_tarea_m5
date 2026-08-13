@@ -1,0 +1,42 @@
+# =============================================================================
+# Clúster kind de un solo nodo, sobre Podman.
+#
+#   KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config k8s/kind-cluster.yaml
+#
+# Un solo nodo y no tres: con 5.8 GiB en la máquina de Podman, tres nodos se
+# comen en sobrecarga del plano de control lo que necesitan los servicios. Un
+# nodo demuestra igual el despliegue orquestado; lo que NO demuestra es la
+# tolerancia a fallos de nodo, y eso queda declarado como limitación.
+#
+# Las asignaciones de puertos son para el Ingress: sin ellas, el navegador del
+# host no puede llegar al ingress-nginx que corre dentro del nodo.
+# =============================================================================
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pedidos-comida
+
+nodes:
+  - role: control-plane
+
+    # Necesario para que ingress-nginx pueda programarse aquí: sin esta
+    # etiqueta, su nodeSelector no encuentra nodo y el pod queda Pending.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+
+    extraPortMappings:
+      # El Ingress: aquí entra todo el tráfico del navegador
+      - containerPort: 80
+        hostPort: 8000
+        protocol: TCP
+      # Kafka, para poder inspeccionarlo desde el host durante la demostración
+      - containerPort: 30092
+        hostPort: 30092
+        protocol: TCP
+      # Postgres, para poder consultar las 5 bases con psql o pgAdmin
+      - containerPort: 30432
+        hostPort: 30432
+        protocol: TCP

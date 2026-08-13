@@ -1,0 +1,12 @@
+# =============================================================================
+# Un namespace propio para todo el sistema.
+#
+# No es solo orden: es la unidad sobre la que se aplican cuotas, políticas de
+# red y permisos. Todo lo demás en esta carpeta vive aquí dentro.
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pedidos
+  labels:
+    app.kubernetes.io/part-of: pedidos-comida

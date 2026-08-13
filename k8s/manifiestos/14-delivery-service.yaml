@@ -1,0 +1,113 @@
+# =============================================================================
+# Servicio de Entregas. Asigna repartidor al confirmarse el pedido y ahí se
+# detiene: el avance lo reporta el repartidor por PATCH.
+#
+# El patrón y los porqués están comentados en 10-user-service.yaml.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: delivery-service
+  namespace: pedidos
+  labels:
+    app: delivery-service
+spec:
+  selector:
+    app: delivery-service
+  ports:
+    - port: 8085
+      targetPort: 8085
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-service
+  namespace: pedidos
+  labels:
+    app: delivery-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delivery-service
+  template:
+    metadata:
+      labels:
+        app: delivery-service
+    spec:
+      containers:
+        - name: delivery-service
+          image: pedidos/delivery-service:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SERVER_PORT
+              value: "8085"
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/deliverydb"
+            - name: DB_USERNAME
+              value: "delivery_svc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: DELIVERY_DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: JWT_SECRET
+            - name: KAFKA_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: KAFKA_SERVERS
+            - name: JAVA_OPTS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: JAVA_OPTS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: LOG_LEVEL
+            - name: POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: POOL_SIZE
+            # En un contenedor, los logs van a stdout y los recoge el clúster.
+            # El archivo se mantiene porque el formato ECS lo escribe ahí, pero
+            # a una ruta efímera: aquí no hay Promtail leyendo un volumen.
+            - name: LOG_FILE
+              value: "/tmp/delivery-service.log"
+            # La observabilidad (Prometheus, Zipkin, Loki, Grafana) se queda en
+            # el despliegue de Podman Compose. Con el muestreo a cero, los
+            # servicios no intentan exportar trazas a un Zipkin que aquí no
+            # existe, y no ensucian el log con avisos de conexión rechazada.
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: "0.0"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8085
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8085
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "100m"
+            limits:
+              memory: "640Mi"
+              cpu: "1000m"

@@ -1,0 +1,113 @@
+# =============================================================================
+# Servicio de Catálogo. Fuente de verdad del precio y la disponibilidad:
+# es el único destino de una llamada síncrona en todo el sistema (ADR-005).
+#
+# El patrón y los porqués están comentados en 10-user-service.yaml.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: pedidos
+  labels:
+    app: catalog-service
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: pedidos
+  labels:
+    app: catalog-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: pedidos/catalog-service:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SERVER_PORT
+              value: "8082"
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/catalogdb"
+            - name: DB_USERNAME
+              value: "catalog_svc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: CATALOG_DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: JWT_SECRET
+            - name: KAFKA_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: KAFKA_SERVERS
+            - name: JAVA_OPTS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: JAVA_OPTS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: LOG_LEVEL
+            - name: POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: POOL_SIZE
+            # En un contenedor, los logs van a stdout y los recoge el clúster.
+            # El archivo se mantiene porque el formato ECS lo escribe ahí, pero
+            # a una ruta efímera: aquí no hay Promtail leyendo un volumen.
+            - name: LOG_FILE
+              value: "/tmp/catalog-service.log"
+            # La observabilidad (Prometheus, Zipkin, Loki, Grafana) se queda en
+            # el despliegue de Podman Compose. Con el muestreo a cero, los
+            # servicios no intentan exportar trazas a un Zipkin que aquí no
+            # existe, y no ensucian el log con avisos de conexión rechazada.
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: "0.0"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "100m"
+            limits:
+              memory: "640Mi"
+              cpu: "1000m"

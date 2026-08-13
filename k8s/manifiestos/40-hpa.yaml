@@ -1,0 +1,93 @@
+# =============================================================================
+# Autoescalado horizontal. Cubre el punto 6.1 del enunciado.
+#
+# REQUISITO: metrics-server, que kind NO trae. Sin él, el HPA se queda en
+# <unknown>/70% para siempre y no escala nada. Ver el README.
+#
+# El límite superior no es arbitrario: los topics tienen TRES particiones, y la
+# partición es la unidad de paralelismo de Kafka. Una cuarta réplica de un
+# servicio consumidor recibiría cero particiones y se quedaría ociosa
+# consumiendo memoria. Por eso maxReplicas: 3 en los consumidores.
+#
+# Es el detalle que distingue escalar un servicio web de escalar un consumidor
+# de eventos: en el primero, más réplicas siempre reparten más carga; en el
+# segundo, el techo lo pone el número de particiones.
+#
+# Escalar más allá exigiría re-particionar los topics, y eso NO es transparente:
+# cambiar el número de particiones cambia a qué partición va cada clave, y con
+# ello se pierde la garantía de orden por pedido que sostiene la saga.
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service
+  namespace: pedidos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: order-service
+  minReplicas: 1
+  maxReplicas: 3          # = número de particiones
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Sin esta ventana, una bajada momentánea de CPU tira una réplica y el
+      # grupo de consumidores se rebalancea sin necesidad. Cada rebalanceo
+      # pausa el consumo de todas las particiones.
+      stabilizationWindowSeconds: 120
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service
+  namespace: pedidos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-service
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+
+---
+# Catálogo es el caso distinto: su carga dominante son LECTURAS por REST
+# (el front pidiendo productos, Pedidos validando precios), no eventos. Ahí el
+# techo de particiones no aplica y puede escalar más, porque quien reparte es
+# el Service, no Kafka.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: catalog-service
+  namespace: pedidos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: catalog-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

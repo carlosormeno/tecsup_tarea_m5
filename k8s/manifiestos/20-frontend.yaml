@@ -1,0 +1,68 @@
+# =============================================================================
+# Front React servido por Nginx.
+#
+# No es un microservicio: son archivos estáticos. Por eso pide una fracción de
+# los recursos de un servicio Java y no tiene base de datos ni topics.
+#
+# La imagen se construye con VITE_MISMO_ORIGEN=true, así que el JavaScript
+# llama a rutas relativas y es el Ingress quien decide a qué servicio va cada
+# una. En el despliegue de compose, en cambio, el front apunta a los cinco
+# puertos del host.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: pedidos
+  labels:
+    app: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: pedidos
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: pedidos/frontend:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "200m"

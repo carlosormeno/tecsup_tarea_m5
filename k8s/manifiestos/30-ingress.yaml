@@ -1,0 +1,100 @@
+# =============================================================================
+# Ingress: el balanceo de carga y el punto único de entrada.
+#
+# Esto es lo que cubre el punto 6.2 del enunciado, y sustituye a lo que allí se
+# proponía como "Nginx e Ingress Controller": el controlador ES nginx, solo que
+# gestionado por Kubernetes en lugar de configurado a mano.
+#
+# Hay DOS niveles de balanceo, y conviene no confundirlos:
+#
+#   Nivel 4, el Service. Cada `Service` reparte entre los pods que casan con su
+#   selector. Si order-service tiene 3 réplicas, el Service alterna entre ellas
+#   sin que nadie configure nada.
+#
+#   Nivel 7, el Ingress. Mira la RUTA de la petición HTTP y decide a qué
+#   Service la manda. Es lo que permite que el navegador vea un solo origen
+#   (http://localhost:8000) en lugar de cinco puertos distintos.
+#
+# Y hay un tercer reparto que no aparece aquí porque no es HTTP: el de Kafka,
+# que reparte particiones entre los consumidores de un grupo. Ese es el que de
+# verdad escala el camino asíncrono del sistema.
+#
+# Las rutas no chocan entre servicios, así que no hace falta reescribirlas ni
+# inventar un prefijo por servicio: /auth y /api/usuarios son de Usuarios,
+# /api/productos de Catálogo, y así. La regla `/` va al final porque
+# ingress-nginx resuelve por prefijo más largo.
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pedidos
+  namespace: pedidos
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
+
+          - path: /api/usuarios
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
+
+          - path: /api/productos
+            pathType: Prefix
+            backend:
+              service:
+                name: catalog-service
+                port:
+                  number: 8082
+
+          - path: /api/restaurantes
+            pathType: Prefix
+            backend:
+              service:
+                name: catalog-service
+                port:
+                  number: 8082
+
+          - path: /api/pedidos
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 8083
+
+          - path: /api/pagos
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-service
+                port:
+                  number: 8084
+
+          - path: /api/entregas
+            pathType: Prefix
+            backend:
+              service:
+                name: delivery-service
+                port:
+                  number: 8085
+
+          # Todo lo demás es el front
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8080

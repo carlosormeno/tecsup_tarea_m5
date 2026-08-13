@@ -1,0 +1,131 @@
+# =============================================================================
+# Servicio de Usuarios. Es el único que EMITE JWT (ADR-011).
+#
+# Este archivo lleva los comentarios del patrón; los otros cuatro servicios son
+# idénticos salvo nombre, puerto y base de datos.
+#
+# Tres cosas que hacen que esto funcione en Kubernetes y no solo "arranque":
+#
+#   1. imagePullPolicy: Never
+#      Las imágenes se construyen en local y se cargan en el nodo con
+#      `kind load`. Sin esto, Kubernetes intentaría bajarlas de Docker Hub,
+#      donde no existen, y el pod quedaría en ErrImagePull.
+#
+#   2. Sondas separadas de liveness y readiness
+#      Spring Boot tarda ~20 s en arrancar. Con una sola sonda habría que
+#      elegir entre reiniciar pods que solo estaban arrancando, o mandarles
+#      tráfico antes de tiempo. Actuator ya expone las dos por separado.
+#
+#   3. requests y limits
+#      El request es lo que el planificador reserva; el limit, lo que el
+#      kernel corta. Sin request, cinco JVM podrían programarse en un nodo
+#      que no las aguanta. Y el limit debe ir por encima del heap de la JVM:
+#      una JVM con -Xmx320m usa más de 320 MB por el metaspace y los hilos.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: pedidos
+  labels:
+    app: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: pedidos
+  labels:
+    app: user-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: pedidos/user-service:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/userdb"
+            - name: DB_USERNAME
+              value: "user_svc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: USER_DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: JWT_SECRET
+            - name: KAFKA_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: KAFKA_SERVERS
+            - name: JAVA_OPTS
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: JAVA_OPTS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: LOG_LEVEL
+            - name: POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: config-comun
+                  key: POOL_SIZE
+            # En un contenedor, los logs van a stdout y los recoge el clúster.
+            # El archivo se mantiene porque el formato ECS lo escribe ahí, pero
+            # a una ruta efímera: aquí no hay Promtail leyendo un volumen.
+            - name: LOG_FILE
+              value: "/tmp/user-service.log"
+            # La observabilidad (Prometheus, Zipkin, Loki, Grafana) se queda en
+            # el despliegue de Podman Compose. Con el muestreo a cero, los
+            # servicios no intentan exportar trazas a un Zipkin que aquí no
+            # existe, y no ensucian el log con avisos de conexión rechazada.
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: "0.0"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "100m"
+            limits:
+              memory: "640Mi"
+              cpu: "1000m"

@@ -1,0 +1,148 @@
+# =============================================================================
+# Postgres: un motor, cinco bases, cinco roles (ADR-003).
+#
+# StatefulSet y no Deployment porque una base de datos tiene identidad y
+# almacenamiento propio: el pod se llama siempre postgres-0 y su volumen le
+# sigue si se reprograma. Un Deployment con PVC funcionaría con una réplica,
+# pero declara mal la intención.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: pedidos
+data:
+  # El mismo script que usa el compose. El REVOKE ... FROM PUBLIC es lo que
+  # hace cumplir de verdad "una base por servicio": sin él, cualquier rol
+  # podría conectarse a cualquier base.
+  01-crear-bases.sh: |
+    #!/bin/bash
+    set -e
+
+    crear_base() {
+        local base=$1
+        local usuario=$2
+        local clave=$3
+
+        echo "  -> creando base '$base' con rol '$usuario'"
+
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+            CREATE USER $usuario WITH PASSWORD '$clave';
+            CREATE DATABASE $base OWNER $usuario;
+            REVOKE ALL ON DATABASE $base FROM PUBLIC;
+            GRANT ALL PRIVILEGES ON DATABASE $base TO $usuario;
+    EOSQL
+    }
+
+    echo "== Creando las bases de los microservicios =="
+
+    crear_base userdb      user_svc      user_pass
+    crear_base catalogdb   catalog_svc   catalog_pass
+    crear_base orderdb     order_svc     order_pass
+    crear_base paymentdb   payment_svc   payment_pass
+    crear_base deliverydb  delivery_svc  delivery_pass
+
+    echo "== Listo: 5 bases, 5 roles, sin permisos cruzados =="
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: pedidos
+spec:
+  # Headless: el StatefulSet necesita una identidad de red estable por pod.
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+# Acceso desde el host para inspeccionar las bases durante la demostración.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-externo
+  namespace: pedidos
+spec:
+  type: NodePort
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      nodePort: 30432
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: pedidos
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secretos
+                  key: POSTGRES_PASSWORD
+            # Sin esto, el script de init no se ejecuta cuando el volumen ya
+            # tiene datos de una instalación anterior.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "500m"
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: datos
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
