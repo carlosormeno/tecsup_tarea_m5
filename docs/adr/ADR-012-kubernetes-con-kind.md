@@ -216,4 +216,5 @@ Todo lo de esta tabla se comprobó en ejecución el 2026-08-12.
 | Prometheus descubre los cinco servicios | `/prometheus/api/v1/targets` | los 5, `up` |
 | Las tres interfaces responden bajo subruta | `/grafana`, `/zipkin`, `/prometheus` | `200`, `200`, `200` |
 | El login funciona **como lo hace el navegador** | `POST /auth/login` con cabecera `Origin` | `200` con token; el preflight `OPTIONS`, `200` |
+| El autoescalado calcula de verdad | `kubectl get hpa -n pedidos` | los 3 con CPU real: 26%, 30% y 29% sobre 70% |
 | No hizo falta tocar código de negocio | `git diff` del despliegue | solo manifiestos, `Dockerfile` y una variable del front |

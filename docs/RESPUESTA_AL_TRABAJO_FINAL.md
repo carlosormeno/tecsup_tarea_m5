@@ -438,6 +438,18 @@ Ese detalle es el que distingue escalar un servicio web de escalar un consumidor
 de eventos: en el primero, más réplicas siempre reparten más carga; en el
 segundo, el techo lo pone el número de particiones.
 
+**Verificado en el clúster**, con metrics-server desplegado:
+
+```
+catalog-service   cpu: 26%/70%   min 1  max 5
+order-service     cpu: 30%/70%   min 1  max 3
+payment-service   cpu: 29%/70%   min 1  max 3
+```
+
+El parche `--kubelet-insecure-tls` de metrics-server es obligatorio en kind: sin
+él no confía en el certificado del kubelet y el HPA se queda en `<unknown>/70%`
+indefinidamente, sin decir por qué.
+
 **Evidencia:**
 ```bash
 podman exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 \
