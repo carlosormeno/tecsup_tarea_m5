@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +37,38 @@ class PedidoRepositoryAdapterTest {
         return Pedido.crear(clienteId, "Av. Arequipa 123", List.of(
                 new LineaPedido(10L, "Pizza margarita", new BigDecimal("35.90"), 2),
                 new LineaPedido(20L, "Gaseosa 500ml", new BigDecimal("5.00"), 3)));
+    }
+
+    /** Con fecha fija: dos pedidos creados en el mismo instante no tienen orden. */
+    private Pedido unPedidoDe(Long clienteId, Instant creadoEn) {
+        return Pedido.reconstituir(UUID.randomUUID(), clienteId, "Av. Arequipa 123",
+                List.of(new LineaPedido(10L, "Pizza margarita", new BigDecimal("35.90"), 2)),
+                EstadoPedido.CREADO, null, creadoEn, creadoEn);
+    }
+
+    @Test
+    @DisplayName("los listados van del más reciente al más antiguo y no se reordenan al actualizar")
+    void ordenEstable() {
+        Instant base = Instant.parse("2026-08-12T10:00:00Z");
+        Pedido viejo = repositorio.guardar(unPedidoDe(1L, base));
+        Pedido medio = repositorio.guardar(unPedidoDe(1L, base.plusSeconds(60)));
+        Pedido nuevo = repositorio.guardar(unPedidoDe(1L, base.plusSeconds(120)));
+
+        // Las dos consultas ordenan igual: si no, la misma lista se ve distinta
+        // según se filtre por cliente o no.
+        assertThat(repositorio.buscarTodos()).extracting(Pedido::getId)
+                .containsExactly(nuevo.getId(), medio.getId(), viejo.getId());
+        assertThat(repositorio.buscarPorCliente(1L)).extracting(Pedido::getId)
+                .containsExactly(nuevo.getId(), medio.getId(), viejo.getId());
+
+        viejo.transicionarA(EstadoPedido.PAGO_EN_PROCESO, null);
+        repositorio.guardar(viejo);
+
+        // El orden es por fecha de creación, no por el orden físico de las
+        // filas. Esta prueba fija el contrato; el reordenamiento real solo se
+        // ve en Postgres, que reescribe la fila actualizada al final del heap.
+        assertThat(repositorio.buscarTodos()).extracting(Pedido::getId)
+                .containsExactly(nuevo.getId(), medio.getId(), viejo.getId());
     }
 
     @Test
@@ -81,6 +114,7 @@ class PedidoRepositoryAdapterTest {
     void actualizaEstado() {
         Pedido pedido = repositorio.guardar(unPedido(1L));
 
+        pedido.transicionarA(EstadoPedido.PAGO_EN_PROCESO, null);
         pedido.transicionarA(EstadoPedido.PAGADO, "tx-001");
         repositorio.guardar(pedido);
 

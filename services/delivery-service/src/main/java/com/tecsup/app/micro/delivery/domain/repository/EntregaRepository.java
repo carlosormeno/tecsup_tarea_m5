@@ -17,6 +17,7 @@ public interface EntregaRepository {
     /** Clave de la idempotencia: ¿este pedido ya tiene entrega? */
     Optional<Entrega> buscarPorPedido(UUID pedidoId);
 
+    /** Todas las entregas, **de la más reciente a la más antigua**. */
     List<Entrega> buscarTodas();
 
     /** Entregas ASIGNADA o EN_CAMINO de un repartidor: su carga actual. */

@@ -10,4 +10,14 @@ import java.util.UUID;
 public interface JpaPedidoRepository extends JpaRepository<PedidoJpaEntity, UUID> {
 
     List<PedidoJpaEntity> findByClienteIdOrderByCreadoEnDesc(Long clienteId);
+
+    /**
+     * Con orden explícito, y no `findAll()`.
+     *
+     * Sin ORDER BY el orden lo decide el plan de Postgres y además cambia al
+     * actualizar una fila, porque la versión nueva se escribe al final del
+     * heap. Las dos listas del sistema —pedidos y entregas— ordenan igual para
+     * que se puedan leer una al lado de la otra.
+     */
+    List<PedidoJpaEntity> findAllByOrderByCreadoEnDesc();
 }

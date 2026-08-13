@@ -42,7 +42,9 @@ public class EntregaRepositoryAdapter implements EntregaRepository {
 
     @Override
     public List<Entrega> buscarTodas() {
-        return jpa.findAll().stream().map(EntregaPersistenceMapper::aDominio).toList();
+        return jpa.findAllByOrderByCreadoEnDesc().stream()
+                .map(EntregaPersistenceMapper::aDominio)
+                .toList();
     }
 
     @Override

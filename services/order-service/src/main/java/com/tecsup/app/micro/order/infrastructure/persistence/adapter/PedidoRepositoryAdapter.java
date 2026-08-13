@@ -39,7 +39,7 @@ public class PedidoRepositoryAdapter implements PedidoRepository {
 
     @Override
     public List<Pedido> buscarTodos() {
-        return jpa.findAll().stream()
+        return jpa.findAllByOrderByCreadoEnDesc().stream()
                 .map(PedidoPersistenceMapper::aDominio)
                 .toList();
     }

@@ -31,7 +31,9 @@ public interface PedidoRepository {
         return buscarPorId(id).orElseThrow(() -> new PedidoNoEncontradoException(id));
     }
 
+    /** Los pedidos de un cliente, **del más reciente al más antiguo**. */
     List<Pedido> buscarPorCliente(Long clienteId);
 
+    /** Todos los pedidos, con el mismo orden que buscarPorCliente. */
     List<Pedido> buscarTodos();
 }
