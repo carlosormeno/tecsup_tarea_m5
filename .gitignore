@@ -69,3 +69,9 @@ Thumbs.db
 # ============================================
 *.bak
 *.orig
+
+# Configuracion local de herramientas, no del proyecto
+.claude/
+
+# Plantilla de trabajo, no forma parte de la entrega
+plantilla_requisitos.md
