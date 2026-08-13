@@ -1,0 +1,14 @@
+# El contexto de build es toda la carpeta services/, porque el POM agregador
+# declara los seis módulos y Maven necesita verlos todos aunque solo se
+# construya uno con -pl. Sin este archivo, el contexto arrastraría los target/
+# de cinco servicios: cientos de megas por imagen, y jars compilados en el host
+# que podrían mezclarse con los del contenedor.
+target/
+*/target/
+*.jar
+*.class
+
+.git/
+.idea/
+*.iml
+.DS_Store

@@ -12,9 +12,13 @@ FROM maven:3.9-eclipse-temurin-21-alpine AS build
 
 WORKDIR /build
 
-COPY pom.xml .
-COPY shared shared
-COPY user-service user-service
+# Se copia TODO el contexto (services/), no solo este módulo y shared.
+#
+# El POM agregador declara los seis módulos, y Maven aborta si alguno
+# falta aunque se construya uno solo con -pl: "Child module ... does not
+# exist". Lo que evita que el contexto pese cientos de megas es el
+# .dockerignore, que deja fuera los target/.
+COPY . .
 
 RUN mvn -B -pl user-service -am clean package -DskipTests
 
